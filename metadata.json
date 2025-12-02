@@ -1,0 +1,5 @@
+{
+  "name": "Dhaka Chaka - Local Bus Finder",
+  "description": "A smart local bus finder for Dhaka city featuring route planning, fare calculation, interactive map selection, and an AI transit assistant.",
+  "requestFramePermissions": []
+}
