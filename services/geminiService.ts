@@ -1,33 +1,35 @@
 import { GoogleGenAI } from "@google/genai";
-import { BUSES, LOCATIONS } from '../constants';
+import { Bus, Location } from '../types';
 
 // Initialize Gemini
-// NOTE: In a real app, ensure process.env.API_KEY is defined.
-// For this environment, we assume it is injected.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-const SYSTEM_INSTRUCTION = `
+export const sendMessageToGemini = async (
+  message: string, 
+  history: {role: 'user'|'model', text: string}[],
+  currentBuses: Bus[],
+  currentLocations: Location[]
+) => {
+  try {
+    const systemInstruction = `
 You are "Dhaka Chaka Assistant", a helpful and knowledgeable local transit expert for Dhaka, Bangladesh.
-You have access to a specific database of buses: ${BUSES.map(b => b.name).join(', ')}.
-You know locations like: ${LOCATIONS.map(l => l.name).join(', ')}.
+You have access to the following current bus database: ${currentBuses.map(b => b.name).join(', ')}.
+You know locations like: ${currentLocations.map(l => l.name).join(', ')}.
 
 Your goals:
 1. Help users find the best bus for their route.
-2. Estimate costs and times based on typical Dhaka traffic (which is heavy).
-3. Be friendly and use local context (e.g., mention traffic at Farmgate).
+2. Estimate costs and times based on typical Dhaka traffic.
+3. Be friendly and use local context.
 4. Keep answers concise.
 
-If the user asks about a route, explain which buses go there.
+If the user asks about a route, explain which buses go there from your list.
 If the user asks about general Dhaka info, provide it.
-Do not hallucinate buses that don't exist in Dhaka commonly, but if asked about buses not in your specific short list, you can use your general knowledge of Dhaka transit (e.g., BRTC, Turag, Projapoti).
 `;
 
-export const sendMessageToGemini = async (message: string, history: {role: 'user'|'model', text: string}[]) => {
-  try {
     const chat = ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: systemInstruction,
       },
       history: history.map(h => ({
         role: h.role,

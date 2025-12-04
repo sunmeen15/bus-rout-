@@ -1,36 +1,66 @@
-import React, { useState, useMemo } from 'react';
-import { MapPin, Navigation2, Search, ArrowRight, Map as MapIcon, X, List } from 'lucide-react';
-import { LOCATIONS, BUSES } from './constants';
+import React, { useState, useMemo, useEffect } from 'react';
+import { MapPin, Navigation2, Search, ArrowRight, Map as MapIcon, X, List, WifiOff, Settings } from 'lucide-react';
 import { findBuses, getBusFullRoute } from './services/busService';
 import { Location, RouteResult } from './types';
 import MapPicker from './components/MapPicker';
 import BusCard from './components/BusCard';
 import BusDetail from './components/BusDetail';
 import GeminiAssistant from './components/GeminiAssistant';
+import AdminPanel from './components/AdminPanel';
+import { useData } from './contexts/DataContext';
 
 const App: React.FC = () => {
+  // Use data from Context (State + LocalStorage) instead of static constants
+  const { locations, buses } = useData();
+  
   const [startLocation, setStartLocation] = useState<Location | null>(null);
   const [endLocation, setEndLocation] = useState<Location | null>(null);
   const [showMapPicker, setShowMapPicker] = useState<'start' | 'end' | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<RouteResult | null>(null);
   const [viewMode, setViewMode] = useState<'search' | 'browse'>('search');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  // Admin State
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Updated FindBuses Logic that accepts dynamic lists
+  // We recreate this logic here or pass the 'buses' array to the service
+  // To keep it clean, we are using the service logic but passing dynamic data
+  const findDynamicBuses = (fromId: string, toId: string) => {
+    // We can use the service function if it supports passing buses, or inline the logic
+    // Since we updated service to take buses, we use that.
+    return findBuses(fromId, toId, buses);
+  };
 
   // Derived state for results
   const busRoutes = useMemo(() => {
     if (viewMode === 'browse') {
-      return BUSES.map(bus => getBusFullRoute(bus));
+      return buses.map(bus => getBusFullRoute(bus));
     }
 
     if (startLocation && endLocation) {
-      return findBuses(startLocation.id, endLocation.id);
+      return findBuses(startLocation.id, endLocation.id, buses);
     }
     return [];
-  }, [startLocation, endLocation, viewMode]);
+  }, [startLocation, endLocation, viewMode, buses]);
 
   // Sort locations alphabetically for dropdown
   const sortedLocations = useMemo(() => {
-    return [...LOCATIONS].sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+    return [...locations].sort((a, b) => a.name.localeCompare(b.name));
+  }, [locations]);
 
   const handleLocationSelect = (loc: Location) => {
     if (showMapPicker === 'start') {
@@ -39,7 +69,7 @@ const App: React.FC = () => {
       setEndLocation(loc);
     }
     setShowMapPicker(null);
-    setViewMode('search'); // Switch back to search when picking a location
+    setViewMode('search'); 
   };
 
   const handleSwap = () => {
@@ -49,17 +79,26 @@ const App: React.FC = () => {
   };
 
   const toggleViewMode = () => {
-    if (viewMode === 'search') {
-      setViewMode('browse');
-    } else {
-      setViewMode('search');
-    }
+    setViewMode(prev => prev === 'search' ? 'browse' : 'search');
+  };
+
+  const handleAdminAuth = () => {
+    // Direct access allowed
+    setShowAdmin(true);
   };
 
   return (
     <div className="min-h-screen bg-slate-50 relative pb-20">
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="bg-slate-800 text-white text-xs py-1 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50">
+          <WifiOff size={12} />
+          You are offline. Bus search works, but map tiles and AI assistant may be unavailable.
+        </div>
+      )}
+
       {/* Navbar */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <nav className={`bg-white border-b border-slate-200 sticky z-30 ${!isOnline ? 'top-6' : 'top-0'}`}>
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-blue-600 text-white p-1.5 rounded-lg">
@@ -69,6 +108,16 @@ const App: React.FC = () => {
               Dhaka Chaka
             </h1>
           </div>
+          
+          {/* VISIBLE ADMIN BUTTON */}
+          <button 
+            onClick={handleAdminAuth} 
+            className="flex items-center gap-2 text-slate-600 hover:text-blue-600 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors font-medium text-sm border border-transparent hover:border-slate-200"
+            title="Open Admin Panel"
+          >
+            <Settings size={18} />
+            <span>Admin</span>
+          </button>
         </div>
       </nav>
 
@@ -96,7 +145,7 @@ const App: React.FC = () => {
                 </div>
                 <select 
                   value={startLocation?.id || ''}
-                  onChange={(e) => setStartLocation(LOCATIONS.find(l => l.id === e.target.value) || null)}
+                  onChange={(e) => setStartLocation(locations.find(l => l.id === e.target.value) || null)}
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none transition-all text-slate-800 font-medium"
                 >
                   <option value="" disabled>Where from?</option>
@@ -124,7 +173,7 @@ const App: React.FC = () => {
                 </div>
                 <select 
                   value={endLocation?.id || ''}
-                  onChange={(e) => setEndLocation(LOCATIONS.find(l => l.id === e.target.value) || null)}
+                  onChange={(e) => setEndLocation(locations.find(l => l.id === e.target.value) || null)}
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none transition-all text-slate-800 font-medium"
                 >
                   <option value="" disabled>Where to?</option>
@@ -202,6 +251,7 @@ const App: React.FC = () => {
             
             <div className="flex-1 relative bg-slate-100">
               <MapPicker 
+                locations={locations}
                 onSelect={handleLocationSelect}
                 onClose={() => setShowMapPicker(null)} 
                 selectedStart={startLocation?.id}
@@ -218,7 +268,13 @@ const App: React.FC = () => {
         <BusDetail 
           result={selectedRoute} 
           onClose={() => setSelectedRoute(null)} 
+          allLocations={locations}
         />
+      )}
+
+      {/* Admin Panel Overlay */}
+      {showAdmin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
       )}
 
       {/* AI Assistant */}

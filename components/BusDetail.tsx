@@ -1,19 +1,19 @@
 import React from 'react';
-import { RouteResult } from '../types';
-import { LOCATIONS } from '../constants';
+import { RouteResult, Location } from '../types';
 import { X, Wifi, Armchair, Wind, Bus as BusIcon } from 'lucide-react';
 import RouteMap from './RouteMap';
 
 interface BusDetailProps {
   result: RouteResult;
   onClose: () => void;
+  allLocations: Location[];
 }
 
-const BusDetail: React.FC<BusDetailProps> = ({ result, onClose }) => {
+const BusDetail: React.FC<BusDetailProps> = ({ result, onClose, allLocations }) => {
   const { bus, path } = result;
   
-  // Resolve location objects for the path
-  const pathLocations = path.map(id => LOCATIONS.find(l => l.id === id)).filter(Boolean) as typeof LOCATIONS;
+  // Resolve location objects for the path using dynamic list
+  const pathLocations = path.map(id => allLocations.find(l => l.id === id)).filter(Boolean) as Location[];
 
   const getFeatureIcon = (feature: string) => {
     const lower = feature.toLowerCase();

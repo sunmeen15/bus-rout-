@@ -1,10 +1,11 @@
 import { Bus, RouteResult } from '../types';
-import { BUSES } from '../constants';
 
-export const findBuses = (fromId: string, toId: string): RouteResult[] => {
+// Updated to accept 'buses' as an argument so it works with dynamic Context data
+export const findBuses = (fromId: string, toId: string, buses: Bus[]): RouteResult[] => {
   const results: RouteResult[] = [];
 
-  BUSES.forEach(bus => {
+  buses.forEach(bus => {
+    // Exact match for start and end location
     const startIndex = bus.routePoints.indexOf(fromId);
     const endIndex = bus.routePoints.indexOf(toId);
 
@@ -34,14 +35,14 @@ export const findBuses = (fromId: string, toId: string): RouteResult[] => {
 
 // Helper to generate a result object representing the full route of a bus
 export const getBusFullRoute = (bus: Bus): RouteResult => {
-  const stopsCount = bus.routePoints.length - 1;
+  const stopsCount = bus.routePoints.length > 1 ? bus.routePoints.length - 1 : 0;
   const totalFare = bus.baseFare + (stopsCount * bus.farePerStop);
   const estimatedTime = 10 + (stopsCount * 5);
   
   return {
     bus,
-    startLocationId: bus.routePoints[0],
-    endLocationId: bus.routePoints[bus.routePoints.length - 1],
+    startLocationId: bus.routePoints[0] || '',
+    endLocationId: bus.routePoints[bus.routePoints.length - 1] || '',
     totalFare,
     stopsCount: bus.routePoints.length, // Total stops count
     estimatedTime,

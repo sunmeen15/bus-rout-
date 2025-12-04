@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { LOCATIONS } from '../constants';
 import { Location } from '../types';
 import { X } from 'lucide-react';
 
 interface MapPickerProps {
+  locations: Location[];
   onSelect: (location: Location) => void;
   onClose: () => void;
   selectedStart?: string;
@@ -12,7 +12,7 @@ interface MapPickerProps {
   isSelecting: 'start' | 'end';
 }
 
-const MapPicker: React.FC<MapPickerProps> = ({ onSelect, onClose, selectedStart, selectedEnd, isSelecting }) => {
+const MapPicker: React.FC<MapPickerProps> = ({ locations, onSelect, onClose, selectedStart, selectedEnd, isSelecting }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
@@ -39,38 +39,10 @@ const MapPicker: React.FC<MapPickerProps> = ({ onSelect, onClose, selectedStart,
 
     const map = mapInstanceRef.current;
 
-    // Fix for map not rendering correctly in modal (the "glitch")
+    // Fix for map not rendering correctly in modal
     setTimeout(() => {
       map.invalidateSize();
     }, 100);
-
-    // Create Markers for all locations
-    LOCATIONS.forEach(loc => {
-      if (!markersRef.current[loc.id]) {
-        // Create initial marker
-        const marker = L.marker([loc.lat, loc.lng], {
-          icon: createMarkerIcon('default')
-        }).addTo(map);
-
-        // Bind Popup
-        marker.bindPopup(`
-          <div style="font-family: sans-serif; text-align: center; padding: 4px;">
-            <div style="font-weight: 600; color: #1e293b; margin-bottom: 2px;">${loc.name}</div>
-            <div style="font-size: 11px; color: #64748b;">Tap to select</div>
-          </div>
-        `, { closeButton: false, offset: [0, -10] });
-
-        // Events
-        marker.on('click', () => {
-          onSelect(loc);
-        });
-
-        marker.on('mouseover', () => marker.openPopup());
-        marker.on('mouseout', () => marker.closePopup());
-
-        markersRef.current[loc.id] = marker;
-      }
-    });
 
     // Cleanup on unmount
     return () => {
@@ -82,8 +54,47 @@ const MapPicker: React.FC<MapPickerProps> = ({ onSelect, onClose, selectedStart,
     };
   }, []);
 
-  // Update Markers when selection changes
+  // Update Markers (Reactive to locations prop)
   useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    // Clear old markers
+    Object.values(markersRef.current).forEach((marker: L.Marker) => marker.remove());
+    markersRef.current = {};
+
+    // Create Markers for all locations
+    locations.forEach(loc => {
+      // Create marker
+      const marker = L.marker([loc.lat, loc.lng], {
+        icon: createMarkerIcon('default')
+      }).addTo(map);
+
+      // Bind Popup
+      marker.bindPopup(`
+        <div style="font-family: sans-serif; text-align: center; padding: 4px;">
+          <div style="font-weight: 600; color: #1e293b; margin-bottom: 2px;">${loc.name}</div>
+          <div style="font-size: 11px; color: #64748b;">Tap to select</div>
+        </div>
+      `, { closeButton: false, offset: [0, -10] });
+
+      // Events
+      marker.on('click', () => {
+        onSelect(loc);
+      });
+
+      marker.on('mouseover', () => marker.openPopup());
+      marker.on('mouseout', () => marker.closePopup());
+
+      markersRef.current[loc.id] = marker;
+    });
+
+    // Re-apply highlights if selection exists
+    updateMarkerHighlights();
+  }, [locations, onSelect]);
+
+  // Update Markers Style when selection changes
+  const updateMarkerHighlights = () => {
     Object.keys(markersRef.current).forEach(id => {
       const marker = markersRef.current[id];
       let type: 'default' | 'start' | 'end' = 'default';
@@ -94,6 +105,10 @@ const MapPicker: React.FC<MapPickerProps> = ({ onSelect, onClose, selectedStart,
       marker.setIcon(createMarkerIcon(type));
       marker.setZIndexOffset(type !== 'default' ? 1000 : 0);
     });
+  };
+
+  useEffect(() => {
+    updateMarkerHighlights();
   }, [selectedStart, selectedEnd]);
 
   // Helper to create custom icons
